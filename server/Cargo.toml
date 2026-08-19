@@ -1,0 +1,8 @@
+[package]
+name = "rustybeta_server"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "rustybeta_server"
+path = "src/lib.rs"
