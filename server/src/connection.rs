@@ -7,6 +7,7 @@ use std::io::ErrorKind;
 
 use crate::protocol::{PacketReader, PacketWriter, clientbound, serverbound};
 use world::World;
+use world::Position;
 
 pub struct Connection {
     stream: TcpStream,
@@ -23,7 +24,7 @@ impl Connection {
         self.handle_login()?;
         self.send_spawn_chunks(5)?;
 
-        clientbound::write_player_pos_nostance(&mut PacketWriter::new(&mut self.stream), 0.0, 5.0, 0.0, 0.0, 0.0, false)?;
+        clientbound::write_player_pos_nostance(&mut PacketWriter::new(&mut self.stream), Position { x: 0.0, y: 5.0, z: 0.0, yaw: 0.0, pitch: 0.0, on_ground: false })?;
         clientbound::set_spawn_pos(&mut PacketWriter::new(&mut self.stream), 0, 5, 0)?;
 
         self.run_loop()

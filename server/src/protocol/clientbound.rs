@@ -3,6 +3,7 @@ use std::io::{Write, Result};
 use super::PacketWriter;
 use world::Chunk;
 use world::{SIZE_X, SIZE_Y, SIZE_Z};
+use world::Position;
 
 pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
     writer.write_u8(0x02)?;
@@ -20,21 +21,21 @@ pub fn write_login<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, world
     writer.flush()
 }
 
-pub fn write_player_pos<W: Write>(writer: &mut PacketWriter<W>, x: f64, y: f64, stance: f64, z: f64, yaw: f32, pitch: f32, on_ground: bool) -> Result<()> {
+pub fn write_player_pos<W: Write>(writer: &mut PacketWriter<W>, position: Position, stance: f64) -> Result<()> {
     writer.write_u8(0x0D)?;
-    writer.write_f64(x)?;
+    writer.write_f64(position.x)?;
     writer.write_f64(stance)?;
-    writer.write_f64(y)?;
-    writer.write_f64(z)?;
-    writer.write_f32(yaw)?;
-    writer.write_f32(pitch)?;
-    writer.write_bool(on_ground)?;
+    writer.write_f64(position.y)?;
+    writer.write_f64(position.z)?;
+    writer.write_f32(position.yaw)?;
+    writer.write_f32(position.pitch)?;
+    writer.write_bool(position.on_ground)?;
 
     writer.flush()
 }
 
-pub fn write_player_pos_nostance<W: Write>(writer: &mut PacketWriter<W>, x: f64, y: f64, z: f64, yaw: f32, pitch: f32, on_ground: bool) -> Result<()> {
-    write_player_pos(writer, x, y, y + 1.62, z, yaw, pitch, on_ground)
+pub fn write_player_pos_nostance<W: Write>(writer: &mut PacketWriter<W>, position: Position) -> Result<()> {
+    write_player_pos(writer, position, position.y + 1.62)
 }
 
 pub fn set_spawn_pos<W: Write>(writer: &mut PacketWriter<W>, x: i32, y: i32, z: i32) -> Result<()> {
