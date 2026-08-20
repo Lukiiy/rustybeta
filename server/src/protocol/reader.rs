@@ -1,7 +1,7 @@
 use std::io::{Read, Result, Error, ErrorKind};
 
 pub struct PacketReader<'a, R: Read> {
-    reader: &'a mut R,
+    reader: &'a mut R
 }
 
 impl<'a, R: Read> PacketReader<'a, R> {
@@ -58,5 +58,9 @@ impl<'a, R: Read> PacketReader<'a, R> {
         let units: Vec<u16> = buf.chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect();
 
         String::from_utf16(&units).map_err(|_| Error::new(ErrorKind::InvalidData, "invalid UTF-16 string"))
+    }
+
+    pub fn read_bool(&mut self) -> Result<bool> {
+        Ok(self.read_u8()? != 0)
     }
 }

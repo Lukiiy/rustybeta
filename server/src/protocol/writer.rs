@@ -1,7 +1,7 @@
 use std::io::{Write, Result, Error, ErrorKind};
 
 pub struct PacketWriter<'a, W: Write> {
-    writer: &'a mut W,
+    writer: &'a mut W
 }
 
 impl<'a, W: Write> PacketWriter<'a, W> {
