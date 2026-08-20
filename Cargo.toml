@@ -3,6 +3,10 @@ name = "rustybeta"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [".", "server", "world"]
+resolver = "2"
+
 [dependencies]
 flate2 = "1.1.9"
 server = { path = "server" }
