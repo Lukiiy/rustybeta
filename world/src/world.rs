@@ -1,10 +1,6 @@
-mod chunk;
-mod generator;
-
 use std::collections::HashMap;
-
-pub use chunk::Chunk;
-pub use generator::{FlatGenerator, Generator};
+use crate::chunk::Chunk;
+use crate::generator::Generator;
 
 pub struct World {
     chunks: HashMap<(i32, i32), Chunk>,
@@ -26,6 +22,7 @@ impl World {
             let mut chunk = Chunk::new(x, z);
 
             generator.generate(&mut chunk);
+
             chunk
         })
     }
