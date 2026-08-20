@@ -1,0 +1,70 @@
+use std::io::{Write, Result};
+
+use super::PacketWriter;
+use world::Chunk;
+
+pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
+    writer.write_u8(0x02)?;
+    writer.write_string("-")?; // ignore auth ig
+    writer.flush()
+}
+
+pub fn write_login<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, world_seed: i64, dimension: i8) -> Result<()> {
+    writer.write_u8(0x01)?;
+    writer.write_i32(entity_id)?;
+    writer.write_string("")?; // unused, yet i did not look into why; maybe i should, maybbe not
+    writer.write_i64(world_seed)?;
+    writer.write_u8(dimension as u8)?;
+
+    writer.flush()
+}
+
+pub fn write_player_pos<W: Write>(writer: &mut PacketWriter<W>, x: f64, y: f64, stance: f64, z: f64, yaw: f32, pitch: f32, on_ground: bool) -> Result<()> {
+    writer.write_u8(0x0D)?;
+    writer.write_f64(x)?;
+    writer.write_f64(stance)?;
+    writer.write_f64(y)?;
+    writer.write_f64(z)?;
+    writer.write_f32(yaw)?;
+    writer.write_f32(pitch)?;
+    writer.write_bool(on_ground)?;
+
+    writer.flush()
+}
+
+pub fn write_player_pos_nostance<W: Write>(writer: &mut PacketWriter<W>, x: f64, y: f64, z: f64, yaw: f32, pitch: f32, on_ground: bool) -> Result<()> {
+    write_player_pos(writer, x, y, y + 1.62, z, yaw, pitch, on_ground)
+}
+
+pub fn set_spawn_pos<W: Write>(writer: &mut PacketWriter<W>, x: i32, y: i32, z: i32) -> Result<()> {
+    writer.write_u8(0x06)?;
+    writer.write_i32(x)?;
+    writer.write_i32(y)?;
+    writer.write_i32(z)?;
+
+    writer.flush()
+}
+
+pub fn send_prechunk<W: Write>(writer: &mut PacketWriter<W>, chunk_x: i32, chunk_z: i32, mode: bool) -> Result<()> {
+    writer.write_u8(0x32)?;
+    writer.write_i32(chunk_x)?;
+    writer.write_i32(chunk_z)?;
+    writer.write_bool(mode)?;
+
+    writer.flush()
+}
+
+pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Result<()> {
+    let data = chunk.compressed()?;
+
+    writer.write_u8(0x33)?;
+    writer.write_i32(chunk.x * 16)?;
+    writer.write_i16(0)?;
+    writer.write_i32(chunk.z * 16)?;
+    writer.write_u8(15)?;
+    writer.write_u8(127)?;
+    writer.write_u8(15)?;
+    writer.write_i32(data.len() as i32)?;
+    writer.write_bytes(&data)?;
+    writer.flush()
+}
