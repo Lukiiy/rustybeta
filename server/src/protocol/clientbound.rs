@@ -2,6 +2,7 @@ use std::io::{Write, Result};
 
 use super::PacketWriter;
 use world::Chunk;
+use world::{SIZE_X, SIZE_Y, SIZE_Z};
 
 pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
     writer.write_u8(0x02)?;
@@ -61,10 +62,11 @@ pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Resu
     writer.write_i32(chunk.x * 16)?;
     writer.write_i16(0)?;
     writer.write_i32(chunk.z * 16)?;
-    writer.write_u8(15)?;
-    writer.write_u8(127)?;
-    writer.write_u8(15)?;
+    writer.write_u8((SIZE_X - 1) as u8)?;
+    writer.write_u8((SIZE_Y - 1) as u8)?;
+    writer.write_u8((SIZE_Z - 1) as u8)?;
     writer.write_i32(data.len() as i32)?;
+
     writer.write_bytes(&data)?;
     writer.flush()
 }
