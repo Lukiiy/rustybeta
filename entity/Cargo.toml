@@ -8,4 +8,5 @@ name = "entity"
 path = "src/lib.rs"
 
 [dependencies]
+protocol = { path = "../protocol" }
 world = { path = "../world" }
