@@ -7,7 +7,6 @@ pub trait Identified {
 }
 
 /// Generic id to Arc<T> registry.
-#[derive(Clone)]
 pub struct EntityRegistry<T> {
     entries: Arc<Mutex<HashMap<i32, Arc<T>>>>
 }
@@ -16,6 +15,14 @@ impl<T> Default for EntityRegistry<T> {
     fn default() -> Self {
         Self {
             entries: Arc::new(Mutex::new(HashMap::new()))
+        }
+    }
+}
+
+impl<T> Clone for EntityRegistry<T> {
+    fn clone(&self) -> Self {
+        Self {
+            entries: Arc::clone(&self.entries),
         }
     }
 }
