@@ -71,3 +71,10 @@ pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Resu
     writer.write_bytes(&data)?;
     writer.flush()
 }
+
+pub fn write_chatmsg<W: Write>(writer: &mut PacketWriter<W>, message: &str) -> Result<()> {
+    writer.write_u8(0x03)?;
+    writer.write_string(message)?;
+
+    writer.flush()
+}
