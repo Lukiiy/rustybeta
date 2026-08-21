@@ -24,6 +24,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "entity"
+version = "0.1.0"
+dependencies = [
+ "protocol",
+ "world",
+]
+
+[[package]]
 name = "flate2"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -44,6 +52,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "protocol"
+version = "0.1.0"
+dependencies = [
+ "world",
+]
+
+[[package]]
 name = "rustybeta"
 version = "0.1.0"
 dependencies = [
@@ -56,6 +71,8 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "entity",
+ "protocol",
  "world",
 ]
 
