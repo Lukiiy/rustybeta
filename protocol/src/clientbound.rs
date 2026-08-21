@@ -78,3 +78,10 @@ pub fn write_chatmsg<W: Write>(writer: &mut PacketWriter<W>, message: &str) -> R
 
     writer.flush()
 }
+
+pub fn write_kick<W: Write>(writer: &mut PacketWriter<W>, reason: &str) -> Result<()> {
+    writer.write_u8(0xFF)?;
+    writer.write_string(reason)?;
+
+    writer.flush()
+}
