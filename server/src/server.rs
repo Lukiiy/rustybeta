@@ -6,6 +6,8 @@ use std::sync::Mutex;
 use crate::connection::Connection;
 use world::World;
 use world::FlatGenerator;
+use entity::player::PlayerRegistry;
+
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -20,7 +22,8 @@ impl Default for ServerConfig {
 
 pub struct Server {
     config: Arc<ServerConfig>,
-    world: Arc<Mutex<World>>
+    world: Arc<Mutex<World>>,
+    players: PlayerRegistry
 }
 
 impl Server {
@@ -32,7 +35,8 @@ impl Server {
 
         Self {
             config: Arc::new(config),
-            world: Arc::new(Mutex::new(world))
+            world: Arc::new(Mutex::new(world)),
+            players: PlayerRegistry::new()
         }
     }
 
@@ -53,10 +57,23 @@ impl Server {
 
         println!("Connection from {ip}");
 
-        if let Err(e) = Connection::new(stream, self.world.clone()).handle() {
-            eprintln!("Connection {ip} failed; reason: {e}");
+        let mut connection = Connection::new(stream, self.world.clone(), self.players.clone());
+
+        match connection.handle() {
+            Ok(player) => {
+                self.players.register(player.clone());
+
+                if let Err(e) = connection.run(player.clone()) {
+                    eprintln!("Connection {ip} failed; reason: {e}");
+                }
+
+                self.players.unregister(player.id());
+            }
+
+            Err(e) => eprintln!("Connection {ip} failed during login: {e}")
         }
 
         println!("Connection from {ip} closed");
     }
+
 }
