@@ -8,6 +8,7 @@ members = [".", "server", "world", "entity", "protocol"]
 resolver = "2"
 
 [dependencies]
+tokio = { version = "1.53.1", features = ["full"] }
 flate2 = "1.1.9"
 server = { path = "server" }
 world = { path = "world" }
