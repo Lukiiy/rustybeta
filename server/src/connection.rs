@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::io::Error;
 use std::io::ErrorKind;
 
-use crate::protocol::{PacketReader, PacketWriter, clientbound, serverbound};
+use protocol::{PacketReader, PacketWriter, clientbound};
 use world::World;
 use world::Position;
 
