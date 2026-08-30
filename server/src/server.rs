@@ -2,12 +2,14 @@ use std::io;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 
 use crate::connection::Connection;
 use world::World;
 use world::FlatGenerator;
 use entity::player::PlayerRegistry;
-
+use protocol::clientbound;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -44,30 +46,48 @@ impl Server {
         let listener = TcpListener::bind(&self.config.bind_addr)?;
 
         println!("b1.7.3 server listening on {}", self.config.bind_addr);
+        self.spawn_tick_thread();
 
         for stream in listener.incoming().flatten() {
-            self.handle_connection(stream);
+            let world = self.world.clone();
+            let players = self.players.clone();
+
+            thread::spawn(move || Self::handle_connection(stream, world, players));
         }
 
         Ok(())
     }
 
-    fn handle_connection(&self, stream: TcpStream) {
+    fn spawn_tick_thread(&self) {
+        let players = self.players.clone();
+
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(1)); // TODO - Hey! This isn't 20 ticks... Not even A TICK!
+
+                players.broadcast(|w| clientbound::write_keepalive(w));
+            }
+        });
+    }
+
+    fn handle_connection(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry) {
         let ip = stream.peer_addr().ok().map(|p| p.ip()).unwrap();
 
         println!("Connection from {ip}");
 
-        let mut connection = Connection::new(stream, self.world.clone(), self.players.clone());
+        let connection = Connection::new(stream, world, players.clone());
 
         match connection.handle() {
-            Ok(player) => {
-                self.players.register(player.clone());
+            Ok((connection, player)) => {
+                let username = player.username.clone();
+
+                players.register(player.clone());
 
                 if let Err(e) = connection.run(player.clone()) {
-                    eprintln!("Connection {ip} failed; reason: {e}");
+                    eprintln!("Connection {ip} ({username}) failed; reason: {e}");
                 }
 
-                self.players.unregister(player.id());
+                players.unregister(player.id());
             }
 
             Err(e) => eprintln!("Connection {ip} failed during login: {e}")
