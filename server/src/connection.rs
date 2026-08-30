@@ -107,28 +107,36 @@ impl Connection {
                     reader.read_bool()?;
                 }
 
-                0x0B => { // player Position
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_bool()?;
+                0x0B => { // player position
+                    let x = reader.read_f64()?;
+                    let y = reader.read_f64()?;
+                    reader.read_f64()?; // stance
+                    let z = reader.read_f64()?;
+                    let on_ground = reader.read_bool()?;
+                    let position = player.position().with_ground(on_ground);
+
+                    self.update_position(player, Position { x, y, z, ..position });
                 }
 
                 0x0C => { // player look
-                    reader.read_f32()?;
-                    reader.read_f32()?;
-                    reader.read_bool()?;
+                    let yaw = reader.read_f32()?;
+                    let pitch = reader.read_f32()?;
+                    let on_ground = reader.read_bool()?;
+                    let position = player.position();
+
+                    self.update_position(player, position.with_look(yaw, pitch).with_ground(on_ground));
                 }
 
-                0x0D => { // player full pos
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f32()?;
-                    reader.read_f32()?;
-                    reader.read_bool()?;
+                0x0D => { // player position & look
+                    let x = reader.read_f64()?;
+                    let y = reader.read_f64()?;
+                    reader.read_f64()?; // stance
+                    let z = reader.read_f64()?;
+                    let yaw = reader.read_f32()?;
+                    let pitch = reader.read_f32()?;
+                    let on_ground = reader.read_bool()?;
+
+                    self.update_position(player, Position { x, y, z, yaw, pitch, on_ground });
                 }
 
                 0x03 => { // chat/cmd
@@ -208,7 +216,7 @@ impl Connection {
                 }
 
                 0xFF => { // disconnect/kick
-                    println!("Last player disconnect: {}", reader.read_string()?);
+                    println!("{} disconnected: {}", player.username, reader.read_string()?);
 
                     return Ok(());
                 }
