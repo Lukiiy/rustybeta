@@ -42,8 +42,11 @@ impl Player {
 
     pub fn send(&self, f: impl FnOnce(&mut PacketWriter<TcpStream>) -> Result<()>) -> Result<()> {
         let mut stream = self.write.lock().unwrap();
+        let mut writer = PacketWriter::new(&mut *stream);
 
-        f(&mut PacketWriter::new(&mut *stream))
+        f(&mut writer)?;
+
+        writer.flush()
     }
 }
 
