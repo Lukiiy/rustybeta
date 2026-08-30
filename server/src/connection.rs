@@ -99,8 +99,17 @@ impl Connection {
                     reader.read_bool()?;
                 }
 
-                0x03 => { // chat TODO
-                    reader.read_string()?;
+                0x03 => { // chat/cmd
+                    let message = reader.read_string()?;
+
+                    if let Some(command) = message.strip_prefix('/') { // TODO
+                        println!("{} issued command: {command}", player.username);
+
+                        continue;
+                    }
+
+                    println!("<{}> {}", player.username, message);
+                    self.players.broadcast(|w| clientbound::write_chatmsg(w, &format!("<{}> {}", player.username, message)));
                 }
 
                 0x12 => { // arm swing
