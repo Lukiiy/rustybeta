@@ -9,3 +9,4 @@ path = "src/lib.rs"
 
 [dependencies]
 world = { path = "../world" }
+utils = { path = "../utils" }
