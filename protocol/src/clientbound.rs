@@ -72,6 +72,12 @@ pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Resu
     writer.flush()
 }
 
+pub fn write_keepalive<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
+    writer.write_u8(0x00)?;
+
+    writer.flush()
+}
+
 pub fn write_chatmsg<W: Write>(writer: &mut PacketWriter<W>, message: &str) -> Result<()> {
     writer.write_u8(0x03)?;
     writer.write_string(message)?;
