@@ -120,7 +120,7 @@ impl Connection {
                     reader.read_u8()?;
                 }
 
-                0x0F => {
+                0x0F => { // block placement
                     reader.read_i32()?;
                     reader.read_u8()?;
                     reader.read_i32()?;
