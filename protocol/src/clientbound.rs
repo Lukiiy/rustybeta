@@ -4,6 +4,7 @@ use super::PacketWriter;
 use world::Chunk;
 use world::{SIZE_X, SIZE_Y, SIZE_Z};
 use world::Position;
+use utils::math;
 
 pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
     writer.write_u8(0x02)?;
@@ -74,6 +75,42 @@ pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Resu
 
 pub fn write_keepalive<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
     writer.write_u8(0x00)?;
+
+    writer.flush()
+}
+
+/// spawn player
+pub fn write_spawnplayer<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, username: &str, position: Position, current_item: i16) -> Result<()> {
+    writer.write_u8(0x14)?;
+    writer.write_i32(entity_id)?;
+    writer.write_string(username)?;
+    writer.write_i32((position.x * 32.0) as i32)?;
+    writer.write_i32((position.y * 32.0) as i32)?;
+    writer.write_i32((position.z * 32.0) as i32)?;
+    writer.write_u8(math::angle_byte(position.yaw))?;
+    writer.write_u8(math::angle_byte(position.pitch))?;
+    writer.write_i16(current_item)?;
+
+    writer.flush()
+}
+
+/// destroy entity
+pub fn destroy_entity<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32) -> Result<()> {
+    writer.write_u8(0x1D)?;
+    writer.write_i32(entity_id)?;
+
+    writer.flush()
+}
+
+/// entity pos update
+pub fn entity_teleport<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, position: Position) -> Result<()> {
+    writer.write_u8(0x22)?;
+    writer.write_i32(entity_id)?;
+    writer.write_i32((position.x * 32.0) as i32)?;
+    writer.write_i32((position.y * 32.0) as i32)?;
+    writer.write_i32((position.z * 32.0) as i32)?;
+    writer.write_u8(math::angle_byte(position.yaw))?;
+    writer.write_u8(math::angle_byte(position.pitch))?;
 
     writer.flush()
 }
