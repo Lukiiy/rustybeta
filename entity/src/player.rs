@@ -59,4 +59,12 @@ impl PlayerRegistry {
     pub fn broadcast(&self, f: impl Fn(&mut PacketWriter<TcpStream>) -> Result<()>) {
         self.for_each(|player| { let _ = player.send(&f); });
     }
+
+    pub fn broadcast_except(&self, except_id: i32, f: impl Fn(&mut PacketWriter<TcpStream>) -> Result<()>) {
+        self.for_each(|player| {
+            if player.id() != except_id {
+                let _ = player.send(&f);
+            }
+        });
+    }
 }
