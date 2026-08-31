@@ -5,29 +5,38 @@ use std::sync::Mutex;
 use std::io::Error;
 use std::io::ErrorKind;
 
-use crate::protocol::{PacketReader, PacketWriter, clientbound, serverbound};
+use protocol::{PacketReader, PacketWriter, clientbound, serverbound};
 use world::World;
 use world::Position;
+use entity::entity::Entity;
+use entity::player::{Player, PlayerRegistry};
 
 pub struct Connection {
     stream: TcpStream,
-    world: Arc<Mutex<World>>
+    world: Arc<Mutex<World>>,
+    players: PlayerRegistry
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream, world: Arc<Mutex<World>>) -> Self {
-        Self { stream, world }
+    pub fn new(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry) -> Self {
+        Self { stream, world, players }
     }
 
-    pub fn handle(mut self) -> Result<()> {
+    /// Initialize a player's connection. handshakes & logins & sends initial chunks;
+    /// Returns a runnable Player
+    pub fn handle(mut self) -> Result<(Self, Arc<Player>)> {
         self.handle_handshake()?;
-        self.handle_login()?;
-        self.send_spawn_chunks(5)?;
 
-        clientbound::write_player_pos_nostance(&mut PacketWriter::new(&mut self.stream), Position { x: 0.0, y: 5.0, z: 0.0, yaw: 0.0, pitch: 0.0, on_ground: false })?;
+        let username = self.read_login()?;
+        let spawn_pos = Position { x: 0.0, y: 5.0, z: 0.0, yaw: 0.0, pitch: 0.0, on_ground: false };
+        let player = Arc::new(Player::new(Entity::new(spawn_pos), username, self.stream.try_clone()?));
+
+        clientbound::write_login(&mut PacketWriter::new(&mut self.stream), player.id(), 0, 0)?;
+        self.send_spawn_chunks(5)?;
+        clientbound::write_player_pos_nostance(&mut PacketWriter::new(&mut self.stream), spawn_pos)?;
         clientbound::set_spawn_pos(&mut PacketWriter::new(&mut self.stream), 0, 5, 0)?;
 
-        self.run_loop()
+        Ok((self, player))
     }
 
     fn handle_handshake(&mut self) -> Result<()> {
@@ -37,12 +46,12 @@ impl Connection {
         clientbound::write_handshake(&mut PacketWriter::new(&mut self.stream))
     }
 
-    fn handle_login(&mut self) -> Result<()> {
+    fn read_login(&mut self) -> Result<String> {
         let packet = serverbound::read_login(&mut PacketReader::new(&mut self.stream))?;
 
         println!("Login request: username={}", packet.username);
 
-        clientbound::write_login(&mut PacketWriter::new(&mut self.stream), 0, 0, 0)
+        Ok(packet.username)
     }
 
     fn send_spawn_chunks(&mut self, radius: i32) -> Result<()> {
@@ -63,7 +72,30 @@ impl Connection {
         Ok(())
     }
 
-    fn run_loop(&mut self) -> Result<()> {
+    /// lifecycle? of a Player; Spawns them for everyone (and viceversa), then loop-handles the packets, then clean up on quit
+    pub fn run(mut self, player: Arc<Player>) -> Result<()> {
+        self.players.for_each(|other| {
+            if other.id() == player.id() { return; }
+
+            let _ = other.send(|writer| clientbound::write_spawnplayer(writer, player.id(), &player.username, player.position(), 0));
+            let _ = player.send(|writer| clientbound::write_spawnplayer(writer, other.id(), &other.username, other.position(), 0));
+        });
+
+        self.players.broadcast_except(player.id(), |w| {
+            clientbound::write_chatmsg(w, &format!("§e{} joined", player.username))
+        });
+
+        let result = self.run_loop(&player);
+
+        self.players.broadcast_except(player.id(), |w| {
+            clientbound::destroy_entity(w, player.id())?;
+            clientbound::write_chatmsg(w, &format!("§e{} left", player.username))
+        });
+
+        result
+    }
+
+    fn run_loop(&mut self, player: &Arc<Player>) -> Result<()> {
         loop {
             let mut reader = PacketReader::new(&mut self.stream);
             let packet_id = reader.read_u8()?;
@@ -75,32 +107,49 @@ impl Connection {
                     reader.read_bool()?;
                 }
 
-                0x0B => { // player Position
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_bool()?;
+                0x0B => { // player position
+                    let x = reader.read_f64()?;
+                    let y = reader.read_f64()?;
+                    reader.read_f64()?; // stance
+                    let z = reader.read_f64()?;
+                    let on_ground = reader.read_bool()?;
+                    let position = player.position().with_ground(on_ground);
+
+                    self.update_position(player, Position { x, y, z, ..position });
                 }
 
                 0x0C => { // player look
-                    reader.read_f32()?;
-                    reader.read_f32()?;
-                    reader.read_bool()?;
+                    let yaw = reader.read_f32()?;
+                    let pitch = reader.read_f32()?;
+                    let on_ground = reader.read_bool()?;
+                    let position = player.position();
+
+                    self.update_position(player, position.with_look(yaw, pitch).with_ground(on_ground));
                 }
 
-                0x0D => { // player full pos
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f64()?;
-                    reader.read_f32()?;
-                    reader.read_f32()?;
-                    reader.read_bool()?;
+                0x0D => { // player position & look
+                    let x = reader.read_f64()?;
+                    let y = reader.read_f64()?;
+                    reader.read_f64()?; // stance
+                    let z = reader.read_f64()?;
+                    let yaw = reader.read_f32()?;
+                    let pitch = reader.read_f32()?;
+                    let on_ground = reader.read_bool()?;
+
+                    self.update_position(player, Position { x, y, z, yaw, pitch, on_ground });
                 }
 
-                0x03 => { // chat TODO
-                    reader.read_string()?;
+                0x03 => { // chat/cmd
+                    let message = reader.read_string()?;
+
+                    if let Some(command) = message.strip_prefix('/') { // TODO
+                        println!("{} issued command: {command}", player.username);
+
+                        continue;
+                    }
+
+                    println!("<{}> {}", player.username, message);
+                    self.players.broadcast(|w| clientbound::write_chatmsg(w, &format!("<{}> {}", player.username, message)));
                 }
 
                 0x12 => { // arm swing
@@ -120,7 +169,7 @@ impl Connection {
                     reader.read_u8()?;
                 }
 
-                0x0F => {
+                0x0F => { // block placement
                     reader.read_i32()?;
                     reader.read_u8()?;
                     reader.read_i32()?;
@@ -167,7 +216,7 @@ impl Connection {
                 }
 
                 0xFF => { // disconnect/kick
-                    println!("Last player disconnect: {}", reader.read_string()?);
+                    println!("{} disconnected: {}", player.username, reader.read_string()?);
 
                     return Ok(());
                 }
@@ -177,5 +226,14 @@ impl Connection {
                 }
             }
         }
+    }
+
+    fn update_position(&self, player: &Arc<Player>, position: Position) {
+        player.set_position(position);
+
+        // TODO: this sends a whole new position to sync, instead of updating via relative-pos packets
+        self.players.broadcast_except(player.id(), |w| {
+            clientbound::entity_teleport(w, player.id(), position)
+        });
     }
 }

@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace]
-members = [".", "server", "world", "entity", "protocol"]
+members = [".", "server", "world", "entity", "protocol", "utils"]
 resolver = "2"
 
 [dependencies]
+tokio = { version = "1.53.1", features = ["full"] }
 flate2 = "1.1.9"
 server = { path = "server" }
 world = { path = "world" }
