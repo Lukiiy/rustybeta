@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{Result, ErrorKind};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -42,8 +42,16 @@ impl Server {
         }
     }
 
-    pub fn run(&self) -> io::Result<()> {
-        let listener = TcpListener::bind(&self.config.bind_addr)?;
+    pub fn run(&self) -> Result<()> {
+        let listener = match TcpListener::bind(&self.config.bind_addr) {
+            Ok(listener) => listener,
+            Err(e) if e.kind() == ErrorKind::AddrInUse => {
+                eprintln!("Port {} is already in use!", self.config.bind_addr);
+
+                return Err(e);
+            }
+            Err(e) => return Err(e)
+        };
 
         println!("b1.7.3 server listening on {}", self.config.bind_addr);
         self.spawn_tick_thread();
