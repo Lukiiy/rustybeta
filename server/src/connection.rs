@@ -81,7 +81,7 @@ impl Connection {
             let _ = player.send(|writer| clientbound::write_spawnplayer(writer, other.id(), &other.username, other.position(), 0));
         });
 
-        self.players.broadcast_except(player.id(), |w| {
+        self.players.broadcast(|w| {
             clientbound::write_chatmsg(w, &format!("§e{} joined", player.username))
         });
 
