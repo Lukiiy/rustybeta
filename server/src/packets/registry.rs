@@ -58,6 +58,23 @@ pub fn registry() -> &'static PacketRegistry {
     REGISTRY.get_or_init(|| {
         let mut r = PacketRegistry::new();
 
+        r.register::<super::handlers::KeepAlivePacket>();
+        r.register::<super::handlers::PlayerFlyingPacket>();
+        r.register::<super::handlers::PlayerPositionPacket>();
+        r.register::<super::handlers::PlayerLookPacket>();
+        r.register::<super::handlers::PlayerPosLookPacket>();
+        r.register::<super::handlers::ChatMessagePacket>();
+        r.register::<super::handlers::ArmAnimationPacket>();
+        r.register::<super::handlers::CloseWindowPacket>();
+        r.register::<super::handlers::PlayerDiggingPacket>();
+        r.register::<super::handlers::BlockPlacementPacket>();
+        r.register::<super::handlers::EntityActionPacket>();
+        r.register::<super::handlers::UseEntityPacket>();
+        r.register::<super::handlers::HeldItemChangePacket>();
+        r.register::<super::handlers::WindowClickPacket>();
+        r.register::<super::handlers::TransactionPacket>();
+        r.register::<super::handlers::DisconnectPacket>();
+
         r
     })
 }
