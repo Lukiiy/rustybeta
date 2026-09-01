@@ -2,14 +2,13 @@ use std::io::Result;
 use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::io::Error;
-use std::io::ErrorKind;
 
 use protocol::{PacketReader, PacketWriter, clientbound, serverbound};
 use world::World;
 use world::Position;
 use entity::entity::Entity;
 use entity::player::{Player, PlayerRegistry};
+use crate::packets::{registry, ConnectionAction, ConnectionContext};
 
 pub struct Connection {
     stream: TcpStream,
@@ -97,143 +96,23 @@ impl Connection {
 
     fn run_loop(&mut self, player: &Arc<Player>) -> Result<()> {
         loop {
-            let mut reader = PacketReader::new(&mut self.stream);
-            let packet_id = reader.read_u8()?;
+            let packet_id = {
+                PacketReader::new(&mut self.stream).read_u8()?
+            };
 
-            match packet_id {
-                0x00 => {} // keep alive
+            let mut ctx = ConnectionContext {
+                stream: &mut self.stream,
+                player,
+                world: &self.world,
+                players: &self.players,
+            };
 
-                0x0A => { // player
-                    reader.read_bool()?;
-                }
-
-                0x0B => { // player position
-                    let x = reader.read_f64()?;
-                    let y = reader.read_f64()?;
-                    reader.read_f64()?; // stance
-                    let z = reader.read_f64()?;
-                    let on_ground = reader.read_bool()?;
-                    let position = player.position().with_ground(on_ground);
-
-                    self.update_position(player, Position { x, y, z, ..position });
-                }
-
-                0x0C => { // player look
-                    let yaw = reader.read_f32()?;
-                    let pitch = reader.read_f32()?;
-                    let on_ground = reader.read_bool()?;
-                    let position = player.position();
-
-                    self.update_position(player, position.with_look(yaw, pitch).with_ground(on_ground));
-                }
-
-                0x0D => { // player position & look
-                    let x = reader.read_f64()?;
-                    let y = reader.read_f64()?;
-                    reader.read_f64()?; // stance
-                    let z = reader.read_f64()?;
-                    let yaw = reader.read_f32()?;
-                    let pitch = reader.read_f32()?;
-                    let on_ground = reader.read_bool()?;
-
-                    self.update_position(player, Position { x, y, z, yaw, pitch, on_ground });
-                }
-
-                0x03 => { // chat/cmd
-                    let message = reader.read_string()?;
-
-                    if let Some(command) = message.strip_prefix('/') { // TODO
-                        println!("{} issued command: {command}", player.username);
-
-                        continue;
-                    }
-
-                    println!("<{}> {}", player.username, message);
-                    self.players.broadcast(|w| clientbound::write_chatmsg(w, &format!("<{}> {}", player.username, message)));
-                }
-
-                0x12 => { // arm swing
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-                }
-
-                0x65 => { // inventory close
-                    reader.read_u8()?;
-                }
-
-                0x0E => { // digging? status, x, y, z, face
-                    reader.read_u8()?;
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-                }
-
-                0x0F => { // block placement
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-
-                    if reader.read_i16()? >= 0 {
-                        reader.read_u8()?;
-                        reader.read_i16()?;
-                    }
-                }
-
-                0x13 => { // eid, action
-                    reader.read_i32()?;
-                    reader.read_u8()?;
-                }
-
-                0x07 => { // use entity
-                    reader.read_i32()?;
-                    reader.read_i32()?;
-                    reader.read_bool()?;
-                }
-
-                0x10 => { // held item change
-                    reader.read_i16()?;
-                }
-
-                0x66 => { // window click
-                    reader.read_u8()?;
-                    reader.read_i16()?;
-                    reader.read_u8()?;
-                    reader.read_i16()?;
-                    reader.read_bool()?;
-
-                    if reader.read_i16()? != -1 {
-                        reader.read_u8()?;
-                        reader.read_i16()?;
-                    }
-                }
-
-                0x6A => { // transaction
-                    reader.read_u8()?;
-                    reader.read_i16()?;
-                    reader.read_bool()?;
-                }
-
-                0xFF => { // disconnect/kick
-                    println!("{} disconnected: {}", player.username, reader.read_string()?);
-
-                    return Ok(());
-                }
-
-                other => {
-                    return Err(Error::new(ErrorKind::InvalidData, format!("unhandled packet 0x{other:02X}")));
-                }
+            match registry().handle(packet_id, &mut ctx)? {
+                ConnectionAction::Continue => continue,
+                ConnectionAction::Disconnect => break
             }
         }
-    }
 
-    fn update_position(&self, player: &Arc<Player>, position: Position) {
-        player.set_position(position);
-
-        // TODO: this sends a whole new position to sync, instead of updating via relative-pos packets
-        self.players.broadcast_except(player.id(), |w| {
-            clientbound::entity_teleport(w, player.id(), position)
-        });
+        Ok(())
     }
 }
