@@ -129,3 +129,13 @@ pub fn write_kick<W: Write>(writer: &mut PacketWriter<W>, reason: &str) -> Resul
 
     Ok(())
 }
+
+pub fn write_player_crouch_lol<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, sneaking: bool) -> Result<()> {
+    writer.write_u8(0x28)?;
+    writer.write_i32(entity_id)?;
+    writer.write_u8(0x00)?;
+    writer.write_u8(if sneaking { 0x02 } else { 0x00 })?;
+    writer.write_u8(0x7F)?;
+
+    Ok(())
+}

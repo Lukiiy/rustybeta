@@ -296,8 +296,24 @@ impl ServerboundPacket for EntityActionPacket {
         })
     }
 
-    fn handle(self, _ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
-        Ok(ConnectionAction::Continue) // TODO
+    fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
+        match self.action {
+            1 => { // yes
+                ctx.players.broadcast_except(ctx.player.id(), |w| {
+                    clientbound::write_player_crouch_lol(w, ctx.player.id(), true)
+                });
+            }
+
+            2 => { // no
+                ctx.players.broadcast_except(ctx.player.id(), |w| {
+                    clientbound::write_player_crouch_lol(w, ctx.player.id(), false)
+                });
+            }
+
+            _ => {}
+        }
+
+        Ok(ConnectionAction::Continue)
     }
 }
 
