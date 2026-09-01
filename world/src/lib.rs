@@ -8,5 +8,6 @@ pub use chunk::Chunk;
 pub use generator::{FlatGenerator, Generator};
 pub use world::World;
 pub use position::Position;
+pub use itemstack::ItemStack;
 
 pub use chunk::{SIZE_X, SIZE_Y, SIZE_Z};
