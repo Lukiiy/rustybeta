@@ -2,6 +2,7 @@ mod chunk;
 mod generator;
 mod world;
 mod position;
+pub mod itemstack;
 
 pub use chunk::Chunk;
 pub use generator::{FlatGenerator, Generator};
