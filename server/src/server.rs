@@ -9,7 +9,7 @@ use crate::connection::Connection;
 use world::World;
 use world::FlatGenerator;
 use entity::player::PlayerRegistry;
-use protocol::clientbound;
+use protocol::clientbound::ClientboundPacket;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -73,7 +73,7 @@ impl Server {
             loop {
                 thread::sleep(Duration::from_secs(1)); // TODO - Hey! This isn't 20 ticks... Not even A TICK!
 
-                players.broadcast(|w| clientbound::write_keepalive(w));
+                players.broadcast(|w| ClientboundPacket::KeepAlive.write(w));
             }
         });
     }

@@ -2,7 +2,7 @@ use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 
 use entity::player::{Player, PlayerRegistry};
-use protocol::clientbound;
+use protocol::clientbound::ClientboundPacket;
 use world::{Position, World};
 
 pub enum ConnectionAction {
@@ -22,7 +22,7 @@ impl<'a> ConnectionContext<'a> {
         self.player.set_position(position);
 
         self.players.broadcast_except(self.player.id(), |w| {
-            clientbound::entity_teleport(w, self.player.id(), position)
+            ClientboundPacket::EntityTeleport { entity_id: self.player.id(), position }.write(w)
         });
     }
 }
