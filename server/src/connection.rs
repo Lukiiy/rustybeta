@@ -80,22 +80,36 @@ impl Connection {
 
     /// lifecycle? of a Player; Spawns them for everyone (and viceversa), then loop-handles the packets, then clean up on quit
     pub fn run(mut self, player: Arc<Player>) -> Result<()> {
+        let spawn_player = ClientboundPacket::SpawnPlayer {
+            entity_id: player.id(),
+            username: player.username.clone(),
+            position: player.position(),
+            current_item: 0
+        };
+
+        let join = ClientboundPacket::ChatMessage { message: format!("§e{} joined", player.username) };
+
         self.players.for_each(|other| {
             if other.id() == player.id() { return; }
 
-            let _ = other.send(|writer| ClientboundPacket::SpawnPlayer { entity_id: player.id(), username: player.username.clone(), position: player.position(), current_item: 0 }.write(writer));
-            let _ = player.send(|writer| ClientboundPacket::SpawnPlayer { entity_id: other.id(), username: other.username.clone(), position: other.position(), current_item: 0 }.write(writer));
+            let _ = other.send(|writer| spawn_player.write(writer));
+            let _ = player.send(|writer| ClientboundPacket::SpawnPlayer {
+                entity_id: other.id(),
+                username: other.username.clone(),
+                position: other.position(),
+                current_item: 0
+            }.write(writer));
         });
 
-        self.players.broadcast(|w| {
-            ClientboundPacket::ChatMessage { message: format!("§e{} joined", player.username) }.write(w)
-        });
+        self.players.broadcast(|w| join.write(w));
 
         let result = self.run_loop(&player);
+        let destroy = ClientboundPacket::DestroyEntity { entity_id: player.id() };
+        let leave = ClientboundPacket::ChatMessage { message: format!("§e{} left", player.username) };
 
         self.players.broadcast_except(player.id(), |w| {
-            ClientboundPacket::DestroyEntity { entity_id: player.id() }.write(w)?;
-            ClientboundPacket::ChatMessage { message: format!("§e{} left", player.username) }.write(w)
+            destroy.write(w)?;
+            leave.write(w)
         });
 
         result
