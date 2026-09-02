@@ -6,6 +6,13 @@ use world::{SIZE_X, SIZE_Y, SIZE_Z};
 use world::Position;
 use utils::math;
 
+#[derive(Debug, Clone)]
+pub enum ClientboundPacket {
+    ChatMessage { message: String },
+    EntityMetadataCrouch { entity_id: i32, is_crouching: bool },
+    Disconnect { reason: String },
+}
+
 pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
     writer.write_u8(0x02)?;
     writer.write_string("-")?; // ignore auth ig

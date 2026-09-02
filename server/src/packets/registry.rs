@@ -1,8 +1,8 @@
-use std::io::{Error, ErrorKind, Result, Write};
+use std::io::{Error, ErrorKind, Result};
 use std::net::TcpStream;
 use std::sync::OnceLock;
 
-use protocol::{PacketReader, PacketWriter};
+use protocol::{PacketReader};
 use super::context::{ConnectionAction, ConnectionContext};
 
 /// Defines a packet that the clients will send to the server.
@@ -12,14 +12,6 @@ pub trait ServerboundPacket: Sized {
 
     fn read(reader: &mut PacketReader<&mut TcpStream>) -> Result<Self>;
     fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction>;
-}
-
-/// Defines a packet that will be sent to clients.
-/// Needs ID and binary serialization code.
-pub trait ClientboundPacket {
-    const ID: u8;
-
-    fn write<W: Write>(&self, writer: &mut PacketWriter<W>) -> Result<()>;
 }
 
 type PacketHandlerFn = fn(&mut ConnectionContext) -> Result<ConnectionAction>;
