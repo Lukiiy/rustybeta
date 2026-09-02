@@ -38,7 +38,6 @@ impl Connection {
 
         self.send_spawn_chunks(5)?;
         ClientboundPacket::player_pos_no_stance(spawn_pos).send(&mut self.stream)?;
-
         ClientboundPacket::SetSpawnPosition { x: 0, y: 5, z: 0 }.send(&mut self.stream)?;
 
         Ok((self, player))
@@ -65,9 +64,7 @@ impl Connection {
 
         for cx in -radius..=radius {
             for cz in -radius..=radius {
-                let mut writer = PacketWriter::new(&mut self.stream);
-
-                ClientboundPacket::PreChunk { chunk_x: cx, chunk_z: cz, mode: true }.write(&mut writer)?;
+                ClientboundPacket::PreChunk { chunk_x: cx, chunk_z: cz, mode: true }.send(&mut self.stream)?;
 
                 let chunk = world.chunk(cx, cz);
 
