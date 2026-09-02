@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use protocol::{PacketReader, PacketWriter, clientbound::ClientboundPacket, serverbound};
+use protocol::{PacketReader, clientbound::ClientboundPacket, serverbound};
 use world::World;
 use world::Position;
 use entity::entity::Entity;
