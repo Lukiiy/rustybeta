@@ -297,21 +297,15 @@ impl ServerboundPacket for EntityActionPacket {
     }
 
     fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
-        match self.action {
-            1 => { // yes
-                ctx.players.broadcast_except(ctx.player.id(), |w| {
-                    ClientboundPacket::PlayerCrouch { entity_id: ctx.player.id(), sneaking: true }.write(w)
-                });
-            }
+        let sneaking = match self.action {
+            1 => true,
+            2 => false,
+            _ => return Ok(ConnectionAction::Continue)
+        };
 
-            2 => { // no
-                ctx.players.broadcast_except(ctx.player.id(), |w| {
-                    ClientboundPacket::PlayerCrouch { entity_id: ctx.player.id(), sneaking: false }.write(w)
-                });
-            }
-
-            _ => {}
-        }
+        ctx.players.broadcast_except(ctx.player.id(), |w| {
+            ClientboundPacket::PlayerCrouch { entity_id: ctx.player.id(), sneaking }.write(w)
+        });
 
         Ok(ConnectionAction::Continue)
     }
