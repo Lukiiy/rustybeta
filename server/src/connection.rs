@@ -46,7 +46,7 @@ impl Connection {
     fn handle_handshake(&mut self) -> Result<()> {
         let packet = serverbound::read_handshake(&mut PacketReader::new(&mut self.stream))?;
 
-        println!("Handshake from client: {packet:?}");
+        println!("Pending {packet:?}");
 
         ClientboundPacket::Handshake.send(&mut self.stream)
     }
@@ -54,7 +54,7 @@ impl Connection {
     fn read_login(&mut self) -> Result<String> {
         let packet = serverbound::read_login(&mut PacketReader::new(&mut self.stream))?;
 
-        println!("Login request: username={}", packet.username);
+        println!("login from {}", packet.username);
 
         Ok(packet.username)
     }
