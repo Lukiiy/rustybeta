@@ -56,7 +56,7 @@ pub fn registry() -> &'static PacketRegistry {
         r.register::<super::handlers::PlayerLookPacket>();
         r.register::<super::handlers::PlayerPosLookPacket>();
         r.register::<super::handlers::ChatMessagePacket>();
-        r.register::<super::handlers::ArmAnimationPacket>();
+        r.register::<super::handlers::AnimationPacket>();
         r.register::<super::handlers::CloseWindowPacket>();
         r.register::<super::handlers::PlayerDiggingPacket>();
         r.register::<super::handlers::BlockPlacementPacket>();

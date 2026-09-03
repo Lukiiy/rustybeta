@@ -57,6 +57,10 @@ pub enum ClientboundPacket {
     },
     Kick {
         reason: String
+    },
+    Animation {
+        entity_id: i32,
+        animate: u8 // 1 = arm swing
     }
 }
 
@@ -176,6 +180,12 @@ impl ClientboundPacket {
             Self::Kick { reason } => {
                 writer.write_u8(0xFF)?;
                 writer.write_string(reason)?;
+            }
+
+            Self::Animation { entity_id, animate } => {
+                writer.write_u8(0x12)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_u8(*animate)?;
             }
         }
 

@@ -178,12 +178,12 @@ impl ServerboundPacket for ChatMessagePacket {
 }
 
 
-pub struct ArmAnimationPacket {
+pub struct AnimationPacket {
     pub entity_id: i32,
     pub animate: u8
 }
 
-impl ServerboundPacket for ArmAnimationPacket {
+impl ServerboundPacket for AnimationPacket {
     const ID: u8 = 0x12;
 
     fn read(reader: &mut PacketReader<&mut TcpStream>) -> Result<Self> {
@@ -193,8 +193,14 @@ impl ServerboundPacket for ArmAnimationPacket {
         })
     }
 
-    fn handle(self, _ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
-        Ok(ConnectionAction::Continue) // TODO
+    fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
+        let packet = ClientboundPacket::Animation {
+            entity_id: ctx.player.id(),
+            animate: self.animate,
+        };
+
+        ctx.players.broadcast_except(ctx.player.id(), |w| packet.write(w));
+        Ok(ConnectionAction::Continue)
     }
 }
 
