@@ -94,6 +94,9 @@ impl Server {
         if let Err(e) = stream.set_write_timeout(Some(config.readwrite_timeout)) {
             eprintln!("↳ failed to set write timeout: {e}");
         }
+        if let Err(e) = stream.set_nodelay(false) {
+            eprintln!("↳ failed to set tcp nodelay: {e}");
+        }
 
         let connection = Connection::new(stream, world, players.clone());
 
