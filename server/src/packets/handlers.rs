@@ -1,6 +1,6 @@
 use std::io::Result;
 use std::net::TcpStream;
-use protocol::{PacketReader, clientbound};
+use protocol::{PacketReader, clientbound::ClientboundPacket};
 
 use super::context::{ConnectionAction, ConnectionContext};
 use super::registry::ServerboundPacket;
@@ -171,7 +171,7 @@ impl ServerboundPacket for ChatMessagePacket {
         }
 
         println!("<{}> {}", ctx.player.username, self.message);
-        ctx.players.broadcast(|w| clientbound::write_chatmsg(w, &format!("<{}> {}", ctx.player.username, self.message)));
+        ctx.players.broadcast(|w| ClientboundPacket::ChatMessage { message: format!("<{}> {}", ctx.player.username, self.message) }.write(w));
 
         Ok(ConnectionAction::Continue)
     }
@@ -297,21 +297,15 @@ impl ServerboundPacket for EntityActionPacket {
     }
 
     fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
-        match self.action {
-            1 => { // yes
-                ctx.players.broadcast_except(ctx.player.id(), |w| {
-                    clientbound::write_player_crouch_lol(w, ctx.player.id(), true)
-                });
-            }
+        let sneaking = match self.action {
+            1 => true,
+            2 => false,
+            _ => return Ok(ConnectionAction::Continue)
+        };
 
-            2 => { // no
-                ctx.players.broadcast_except(ctx.player.id(), |w| {
-                    clientbound::write_player_crouch_lol(w, ctx.player.id(), false)
-                });
-            }
-
-            _ => {}
-        }
+        ctx.players.broadcast_except(ctx.player.id(), |w| {
+            ClientboundPacket::PlayerCrouch { entity_id: ctx.player.id(), sneaking }.write(w)
+        });
 
         Ok(ConnectionAction::Continue)
     }

@@ -6,143 +6,185 @@ use world::{SIZE_X, SIZE_Y, SIZE_Z};
 use world::Position;
 use utils::math;
 
+/// I still don't really know if this will be kept as a giant enum just for clientbound packets, but I'll stick to it for now. Why? They're simpler than serverbound ones and i also don't want to mess a lot more with memory or possible missmatching IDs and structs;
 #[derive(Debug, Clone)]
 pub enum ClientboundPacket {
-    ChatMessage { message: String },
-    EntityMetadataCrouch { entity_id: i32, is_crouching: bool },
-    Disconnect { reason: String },
+    KeepAlive,
+    Login {
+        entity_id: i32,
+        world_seed: i64,
+        dimension: i8
+    },
+    Handshake,
+    ChatMessage {
+        message: String
+    },
+    SetSpawnPosition {
+        x: i32,
+        y: i32,
+        z: i32
+    },
+    PlayerPositionLook {
+        position: Position,
+        stance: f64
+    },
+    SpawnPlayer {
+        entity_id: i32,
+        username: String,
+        position: Position,
+        current_item: i16
+    },
+    DestroyEntity {
+        entity_id: i32
+    },
+    EntityTeleport {
+        entity_id: i32,
+        position: Position
+    },
+    PlayerCrouch {
+        entity_id: i32,
+        sneaking: bool
+    },
+    PreChunk {
+        chunk_x: i32,
+        chunk_z: i32,
+        mode: bool
+    },
+    Chunk {
+        chunk_x: i32,
+        chunk_z: i32,
+        data: Vec<u8>
+    },
+    Kick {
+        reason: String
+    }
 }
 
-pub fn write_handshake<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
-    writer.write_u8(0x02)?;
-    writer.write_string("-")?; // ignore auth ig
+impl ClientboundPacket {
+    pub fn player_pos_no_stance(position: Position) -> Self {
+        Self::PlayerPositionLook {
+            stance: position.y + 1.62,
+            position
+        }
+    }
 
-    Ok(())
-}
+    pub fn from_chunk(chunk: &Chunk) -> Result<Self> {
+        Ok(Self::Chunk {
+            chunk_x: chunk.x,
+            chunk_z: chunk.z,
+            data: chunk.compressed()?
+        })
+    }
 
-pub fn write_login<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, world_seed: i64, dimension: i8) -> Result<()> {
-    writer.write_u8(0x01)?;
-    writer.write_i32(entity_id)?;
-    writer.write_string("")?; // unused, yet i did not look into why; maybe i should, maybbe not
-    writer.write_i64(world_seed)?;
-    writer.write_u8(dimension as u8)?;
+    /// serializes data to writer
+    pub fn write<W: Write>(&self, writer: &mut PacketWriter<W>) -> Result<()> {
+        match self {
+            Self::KeepAlive => {
+                writer.write_u8(0x00)?;
+            }
 
-    Ok(())
-}
+            Self::Login { entity_id, world_seed, dimension } => {
+                writer.write_u8(0x01)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_string("")?;
+                writer.write_i64(*world_seed)?;
+                writer.write_u8(*dimension as u8)?;
+            }
 
-pub fn write_player_pos<W: Write>(writer: &mut PacketWriter<W>, position: Position, stance: f64) -> Result<()> {
-    writer.write_u8(0x0D)?;
-    writer.write_f64(position.x)?;
-    writer.write_f64(stance)?;
-    writer.write_f64(position.y)?;
-    writer.write_f64(position.z)?;
-    writer.write_f32(position.yaw)?;
-    writer.write_f32(position.pitch)?;
-    writer.write_bool(position.on_ground)?;
+            Self::Handshake => {
+                writer.write_u8(0x02)?;
+                writer.write_string("-")?;
+            }
 
-    Ok(())
-}
+            Self::ChatMessage { message } => {
+                writer.write_u8(0x03)?;
+                writer.write_string(message)?;
+            }
 
-pub fn write_player_pos_nostance<W: Write>(writer: &mut PacketWriter<W>, position: Position) -> Result<()> {
-    write_player_pos(writer, position, position.y + 1.62)
-}
+            Self::SetSpawnPosition { x, y, z } => {
+                writer.write_u8(0x06)?;
+                writer.write_i32(*x)?;
+                writer.write_i32(*y)?;
+                writer.write_i32(*z)?;
+            }
 
-pub fn set_spawn_pos<W: Write>(writer: &mut PacketWriter<W>, x: i32, y: i32, z: i32) -> Result<()> {
-    writer.write_u8(0x06)?;
-    writer.write_i32(x)?;
-    writer.write_i32(y)?;
-    writer.write_i32(z)?;
+            Self::PlayerPositionLook { position, stance } => {
+                writer.write_u8(0x0D)?;
+                writer.write_f64(position.x)?;
+                writer.write_f64(*stance)?;
+                writer.write_f64(position.y)?;
+                writer.write_f64(position.z)?;
+                writer.write_f32(position.yaw)?;
+                writer.write_f32(position.pitch)?;
+                writer.write_bool(position.on_ground)?;
+            }
 
-    Ok(())
-}
+            Self::SpawnPlayer { entity_id, username, position, current_item } => {
+                writer.write_u8(0x14)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_string(username)?;
+                writer.write_i32((position.x * 32.0) as i32)?;
+                writer.write_i32((position.y * 32.0) as i32)?;
+                writer.write_i32((position.z * 32.0) as i32)?;
+                writer.write_u8(math::angle_byte(position.yaw))?;
+                writer.write_u8(math::angle_byte(position.pitch))?;
+                writer.write_i16(*current_item)?;
+            }
 
-pub fn send_prechunk<W: Write>(writer: &mut PacketWriter<W>, chunk_x: i32, chunk_z: i32, mode: bool) -> Result<()> {
-    writer.write_u8(0x32)?;
-    writer.write_i32(chunk_x)?;
-    writer.write_i32(chunk_z)?;
-    writer.write_bool(mode)?;
+            Self::DestroyEntity { entity_id } => {
+                writer.write_u8(0x1D)?;
+                writer.write_i32(*entity_id)?;
+            }
 
-    Ok(())
-}
+            Self::EntityTeleport { entity_id, position } => {
+                writer.write_u8(0x22)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_i32((position.x * 32.0) as i32)?;
+                writer.write_i32((position.y * 32.0) as i32)?;
+                writer.write_i32((position.z * 32.0) as i32)?;
+                writer.write_u8(math::angle_byte(position.yaw))?;
+                writer.write_u8(math::angle_byte(position.pitch))?;
+            }
 
-pub fn send_chunk<W: Write>(writer: &mut PacketWriter<W>, chunk: &Chunk) -> Result<()> {
-    let data = chunk.compressed()?;
+            Self::PlayerCrouch { entity_id, sneaking } => {
+                writer.write_u8(0x28)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_u8(0x00)?;
+                writer.write_u8(if *sneaking { 0x02 } else { 0x00 })?;
+                writer.write_u8(0x7F)?;
+            }
 
-    writer.write_u8(0x33)?;
-    writer.write_i32(chunk.x * 16)?;
-    writer.write_i16(0)?;
-    writer.write_i32(chunk.z * 16)?;
-    writer.write_u8((SIZE_X - 1) as u8)?;
-    writer.write_u8((SIZE_Y - 1) as u8)?;
-    writer.write_u8((SIZE_Z - 1) as u8)?;
-    writer.write_i32(data.len() as i32)?;
+            Self::PreChunk { chunk_x, chunk_z, mode } => {
+                writer.write_u8(0x32)?;
+                writer.write_i32(*chunk_x)?;
+                writer.write_i32(*chunk_z)?;
+                writer.write_bool(*mode)?;
+            }
 
-    writer.write_bytes(&data)?;
-    Ok(())
-}
+            Self::Chunk { chunk_x, chunk_z, data } => {
+                writer.write_u8(0x33)?;
+                writer.write_i32(chunk_x * 16)?;
+                writer.write_i16(0)?;
+                writer.write_i32(chunk_z * 16)?;
+                writer.write_u8((SIZE_X - 1) as u8)?;
+                writer.write_u8((SIZE_Y - 1) as u8)?;
+                writer.write_u8((SIZE_Z - 1) as u8)?;
+                writer.write_i32(data.len() as i32)?;
+                writer.write_bytes(data)?;
+            }
 
-pub fn write_keepalive<W: Write>(writer: &mut PacketWriter<W>) -> Result<()> {
-    writer.write_u8(0x00)?;
+            Self::Kick { reason } => {
+                writer.write_u8(0xFF)?;
+                writer.write_string(reason)?;
+            }
+        }
 
-    Ok(())
-}
+        Ok(())
+    }
 
-/// spawn player
-pub fn write_spawnplayer<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, username: &str, position: Position, current_item: i16) -> Result<()> {
-    writer.write_u8(0x14)?;
-    writer.write_i32(entity_id)?;
-    writer.write_string(username)?;
-    writer.write_i32((position.x * 32.0) as i32)?;
-    writer.write_i32((position.y * 32.0) as i32)?;
-    writer.write_i32((position.z * 32.0) as i32)?;
-    writer.write_u8(math::angle_byte(position.yaw))?;
-    writer.write_u8(math::angle_byte(position.pitch))?;
-    writer.write_i16(current_item)?;
+    pub fn send<W: Write>(&self, stream: &mut W) -> Result<()> {
+        let mut writer = PacketWriter::new(stream);
 
-    Ok(())
-}
-
-/// destroy entity
-pub fn destroy_entity<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32) -> Result<()> {
-    writer.write_u8(0x1D)?;
-    writer.write_i32(entity_id)?;
-
-    Ok(())
-}
-
-/// entity teleport
-pub fn entity_teleport<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, position: Position) -> Result<()> {
-    writer.write_u8(0x22)?;
-    writer.write_i32(entity_id)?;
-    writer.write_i32((position.x * 32.0) as i32)?;
-    writer.write_i32((position.y * 32.0) as i32)?;
-    writer.write_i32((position.z * 32.0) as i32)?;
-    writer.write_u8(math::angle_byte(position.yaw))?;
-    writer.write_u8(math::angle_byte(position.pitch))?;
-
-    Ok(())
-}
-
-pub fn write_chatmsg<W: Write>(writer: &mut PacketWriter<W>, message: &str) -> Result<()> {
-    writer.write_u8(0x03)?;
-    writer.write_string(message)?;
-
-    Ok(())
-}
-
-pub fn write_kick<W: Write>(writer: &mut PacketWriter<W>, reason: &str) -> Result<()> {
-    writer.write_u8(0xFF)?;
-    writer.write_string(reason)?;
-
-    Ok(())
-}
-
-pub fn write_player_crouch_lol<W: Write>(writer: &mut PacketWriter<W>, entity_id: i32, sneaking: bool) -> Result<()> {
-    writer.write_u8(0x28)?;
-    writer.write_i32(entity_id)?;
-    writer.write_u8(0x00)?;
-    writer.write_u8(if sneaking { 0x02 } else { 0x00 })?;
-    writer.write_u8(0x7F)?;
-
-    Ok(())
+        self.write(&mut writer)
+    }
 }

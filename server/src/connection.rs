@@ -3,7 +3,7 @@ use std::net::TcpStream;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use protocol::{PacketReader, PacketWriter, clientbound, serverbound};
+use protocol::{PacketReader, clientbound::ClientboundPacket, serverbound};
 use world::World;
 use world::Position;
 use entity::entity::Entity;
@@ -30,10 +30,15 @@ impl Connection {
         let spawn_pos = Position { x: 0.0, y: 5.0, z: 0.0, yaw: 0.0, pitch: 0.0, on_ground: false };
         let player = Arc::new(Player::new(Entity::new(spawn_pos), username, self.stream.try_clone()?));
 
-        clientbound::write_login(&mut PacketWriter::new(&mut self.stream), player.id(), 0, 0)?;
+        ClientboundPacket::Login {
+            entity_id: player.id(),
+            world_seed: 0,
+            dimension: 0
+        }.send(&mut self.stream)?;
+
         self.send_spawn_chunks(5)?;
-        clientbound::write_player_pos_nostance(&mut PacketWriter::new(&mut self.stream), spawn_pos)?;
-        clientbound::set_spawn_pos(&mut PacketWriter::new(&mut self.stream), 0, 5, 0)?;
+        ClientboundPacket::player_pos_no_stance(spawn_pos).send(&mut self.stream)?;
+        ClientboundPacket::SetSpawnPosition { x: 0, y: 5, z: 0 }.send(&mut self.stream)?;
 
         Ok((self, player))
     }
@@ -42,7 +47,8 @@ impl Connection {
         let packet = serverbound::read_handshake(&mut PacketReader::new(&mut self.stream))?;
 
         println!("Handshake from client: {packet:?}");
-        clientbound::write_handshake(&mut PacketWriter::new(&mut self.stream))
+
+        ClientboundPacket::Handshake.send(&mut self.stream)
     }
 
     fn read_login(&mut self) -> Result<String> {
@@ -58,13 +64,11 @@ impl Connection {
 
         for cx in -radius..=radius {
             for cz in -radius..=radius {
-                let mut writer = PacketWriter::new(&mut self.stream);
-
-                clientbound::send_prechunk(&mut writer, cx, cz, true)?;
+                ClientboundPacket::PreChunk { chunk_x: cx, chunk_z: cz, mode: true }.send(&mut self.stream)?;
 
                 let chunk = world.chunk(cx, cz);
 
-                clientbound::send_chunk(&mut writer, chunk)?;
+                ClientboundPacket::from_chunk(chunk)?.send(&mut self.stream)?;
             }
         }
 
@@ -73,22 +77,36 @@ impl Connection {
 
     /// lifecycle? of a Player; Spawns them for everyone (and viceversa), then loop-handles the packets, then clean up on quit
     pub fn run(mut self, player: Arc<Player>) -> Result<()> {
+        let spawn_player = ClientboundPacket::SpawnPlayer {
+            entity_id: player.id(),
+            username: player.username.clone(),
+            position: player.position(),
+            current_item: 0
+        };
+
+        let join = ClientboundPacket::ChatMessage { message: format!("§e{} joined", player.username) };
+
         self.players.for_each(|other| {
             if other.id() == player.id() { return; }
 
-            let _ = other.send(|writer| clientbound::write_spawnplayer(writer, player.id(), &player.username, player.position(), 0));
-            let _ = player.send(|writer| clientbound::write_spawnplayer(writer, other.id(), &other.username, other.position(), 0));
+            let _ = other.send(|writer| spawn_player.write(writer));
+            let _ = player.send(|writer| ClientboundPacket::SpawnPlayer {
+                entity_id: other.id(),
+                username: other.username.clone(),
+                position: other.position(),
+                current_item: 0
+            }.write(writer));
         });
 
-        self.players.broadcast(|w| {
-            clientbound::write_chatmsg(w, &format!("§e{} joined", player.username))
-        });
+        self.players.broadcast(|w| join.write(w));
 
         let result = self.run_loop(&player);
+        let destroy = ClientboundPacket::DestroyEntity { entity_id: player.id() };
+        let leave = ClientboundPacket::ChatMessage { message: format!("§e{} left", player.username) };
 
         self.players.broadcast_except(player.id(), |w| {
-            clientbound::destroy_entity(w, player.id())?;
-            clientbound::write_chatmsg(w, &format!("§e{} left", player.username))
+            destroy.write(w)?;
+            leave.write(w)
         });
 
         result
