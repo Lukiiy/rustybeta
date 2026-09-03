@@ -14,11 +14,15 @@ use protocol::clientbound;
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
     pub bind_addr: String,
+    pub readwrite_timeout: Duration
 }
 
 impl Default for ServerConfig {
     fn default() -> Self {
-        Self { bind_addr: "0.0.0.0:25565".into() }
+        Self {
+            bind_addr: "0.0.0.0:25565".into(),
+            readwrite_timeout: Duration::from_secs(30)
+        }
     }
 }
 
@@ -59,8 +63,9 @@ impl Server {
         for stream in listener.incoming().flatten() {
             let world = self.world.clone();
             let players = self.players.clone();
+            let config = self.config.clone();
 
-            thread::spawn(move || Self::handle_connection(stream, world, players));
+            thread::spawn(move || Self::handle_connection(stream, world, players, config));
         }
 
         Ok(())
@@ -78,10 +83,17 @@ impl Server {
         });
     }
 
-    fn handle_connection(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry) {
+    fn handle_connection(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry, config: Arc<ServerConfig>) {
         let ip = stream.peer_addr().ok().map(|p| p.ip()).unwrap();
 
         println!("Connection from {ip}");
+
+        if let Err(e) = stream.set_read_timeout(Some(config.readwrite_timeout)) {
+            eprintln!("↳ failed to set read timeout: {e}");
+        }
+        if let Err(e) = stream.set_write_timeout(Some(config.readwrite_timeout)) {
+            eprintln!("↳ failed to set write timeout: {e}");
+        }
 
         let connection = Connection::new(stream, world, players.clone());
 
