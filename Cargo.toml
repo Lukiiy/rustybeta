@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace]
-members = [".", "server", "world", "entity", "protocol", "utils"]
+members = [".", "server", "world", "entity", "protocol", "utils", "event"]
 resolver = "2"
 
 [dependencies]
