@@ -13,6 +13,10 @@ impl<'a, W: Write> PacketWriter<'a, W> {
         self.writer.write_all(data)
     }
 
+    pub fn write_i8(&mut self, v: i8) -> Result<()> {
+        self.write_u8(v as u8)
+    }
+
     pub fn write_u8(&mut self, v: u8) -> Result<()> {
         self.writer.write_all(&[v])
     }
