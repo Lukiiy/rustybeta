@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use crate::connection::Connection;
 use world::World;
-use world::FlatGenerator;
 use entity::player::PlayerRegistry;
 use protocol::clientbound::ClientboundPacket;
 
@@ -33,12 +32,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(config: ServerConfig) -> Self {
-        let world = World::new(FlatGenerator {
-            height: 4,
-            block: 1
-        });
-
+    pub fn new(config: ServerConfig, world: World) -> Self {
         Self {
             config: Arc::new(config),
             world: Arc::new(Mutex::new(world)),
@@ -118,5 +112,4 @@ impl Server {
 
         println!("Connection from {ip} closed");
     }
-
 }
