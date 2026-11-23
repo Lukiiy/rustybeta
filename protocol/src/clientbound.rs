@@ -61,6 +61,14 @@ pub enum ClientboundPacket {
     Animation {
         entity_id: i32,
         animate: u8 // 1 = arm swing
+    },
+    EntityMove {
+        entity_id: i32,
+        dx: i8,
+        dy: i8,
+        dz: i8,
+        yaw: u8,
+        pitch: u8
     }
 }
 
@@ -186,6 +194,16 @@ impl ClientboundPacket {
                 writer.write_u8(0x12)?;
                 writer.write_i32(*entity_id)?;
                 writer.write_u8(*animate)?;
+            }
+
+            Self::EntityMove { entity_id, dx, dy, dz, yaw, pitch } => {
+                writer.write_u8(0x21)?;
+                writer.write_i32(*entity_id)?;
+                writer.write_i8(*dx)?;
+                writer.write_i8(*dy)?;
+                writer.write_i8(*dz)?;
+                writer.write_u8(*yaw)?;
+                writer.write_u8(*pitch)?;
             }
         }
 
