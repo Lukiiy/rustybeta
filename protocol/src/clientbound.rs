@@ -4,7 +4,7 @@ use super::PacketWriter;
 use world::Chunk;
 use world::{SIZE_X, SIZE_Y, SIZE_Z};
 use world::Position;
-use utils::math;
+use utils::math::{self, angle_byte, fixed_point};
 
 /// I still don't really know if this will be kept as a giant enum just for clientbound packets, but I'll stick to it for now. Why? They're simpler than serverbound ones and i also don't want to mess a lot more with memory or possible missmatching IDs and structs;
 #[derive(Debug, Clone)]
@@ -151,11 +151,11 @@ impl ClientboundPacket {
             Self::EntityTeleport { entity_id, position } => {
                 writer.write_u8(0x22)?;
                 writer.write_i32(*entity_id)?;
-                writer.write_i32((position.x * 32.0) as i32)?;
-                writer.write_i32((position.y * 32.0) as i32)?;
-                writer.write_i32((position.z * 32.0) as i32)?;
-                writer.write_u8(math::angle_byte(position.yaw))?;
-                writer.write_u8(math::angle_byte(position.pitch))?;
+                writer.write_i32(fixed_point(position.x))?;
+                writer.write_i32(fixed_point(position.y))?;
+                writer.write_i32(fixed_point(position.z))?;
+                writer.write_u8(angle_byte(position.yaw))?;
+                writer.write_u8(angle_byte(position.pitch))?;
             }
 
             Self::PlayerCrouch { entity_id, sneaking } => {
