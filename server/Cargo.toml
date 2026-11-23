@@ -11,3 +11,4 @@ path = "src/lib.rs"
 protocol = { path = "../protocol" }
 world = { path = "../world" }
 entity = { path = "../entity" }
+utils = { path = "../utils"}
