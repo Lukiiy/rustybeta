@@ -52,8 +52,8 @@ impl Encode for Kick {
 
 #[derive(Debug, Clone)]
 pub struct Animation {
-    pub entity_id: i32,
-    pub animate: u8
+    pub id: i32,
+    pub animate: u8  // 1 = arm swing
 }
 
 impl Packet for Animation {
@@ -62,7 +62,7 @@ impl Packet for Animation {
 
 impl Encode for Animation {
     fn encode<W: Write>(&self, w: &mut PacketWriter<W>) -> Result<()> {
-        w.write_i32(self.entity_id)?;
+        w.write_i32(self.id)?;
         w.write_u8(self.animate)
     }
 }
