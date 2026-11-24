@@ -188,7 +188,6 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "entity",
- "event",
  "protocol",
  "utils",
  "world",
