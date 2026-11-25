@@ -134,3 +134,7 @@ impl Connection {
         Ok(())
     }
 }
+
+fn unexpected(state: &str, packet: &Serverbound) -> Error {
+    Error::new(ErrorKind::InvalidData, format!("Expected {state}, got {packet:?}"))
+}
