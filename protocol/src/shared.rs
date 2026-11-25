@@ -67,6 +67,15 @@ impl Encode for Animation {
     }
 }
 
+impl Decode for Animation {
+    fn decode<R: Read>(r: &mut PacketReader<R>) -> Result<Self> {
+        Ok(Self {
+            id: r.read_i32()?,
+            animate: r.read_u8()?
+        })
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
