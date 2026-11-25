@@ -6,9 +6,10 @@ use std::thread;
 use std::time::Duration;
 
 use crate::connection::Connection;
+use crate::packets::PacketRegistry;
+use protocol::shared::KeepAlive;
 use world::World;
 use entity::player::PlayerRegistry;
-use protocol::clientbound::ClientboundPacket;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -28,7 +29,8 @@ impl Default for ServerConfig {
 pub struct Server {
     config: Arc<ServerConfig>,
     world: Arc<Mutex<World>>,
-    players: PlayerRegistry
+    players: PlayerRegistry,
+    packets: Arc<PacketRegistry>
 }
 
 impl Server {
@@ -36,7 +38,8 @@ impl Server {
         Self {
             config: Arc::new(config),
             world: Arc::new(Mutex::new(world)),
-            players: PlayerRegistry::new()
+            players: PlayerRegistry::new(),
+            packets: Arc::new(PacketRegistry::vanilla())
         }
     }
 
@@ -58,8 +61,9 @@ impl Server {
             let world = self.world.clone();
             let players = self.players.clone();
             let config = self.config.clone();
+            let packets = self.packets.clone();
 
-            thread::spawn(move || Self::handle_connection(stream, world, players, config));
+            thread::spawn(move || Self::handle_connection(stream, world, players, config, packets));
         }
 
         Ok(())
@@ -72,12 +76,16 @@ impl Server {
             loop {
                 thread::sleep(Duration::from_secs(1)); // TODO - Hey! This isn't 20 ticks... Not even A TICK!
 
-                players.broadcast(|w| ClientboundPacket::KeepAlive.write(w));
+                players.broadcast(KeepAlive);
             }
         });
     }
 
-    fn handle_connection(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry, config: Arc<ServerConfig>) {
+    pub fn packets(&mut self) -> &mut PacketRegistry {
+        Arc::get_mut(&mut self.packets).expect("Oh no! Packet handlers cant change once the server is running!")
+    }
+
+    fn handle_connection(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry, config: Arc<ServerConfig>, packets: Arc<PacketRegistry>) {
         let ip = stream.peer_addr().ok().map(|p| p.ip()).unwrap();
 
         println!("Connection from {ip}");
@@ -92,7 +100,11 @@ impl Server {
             eprintln!("↳ failed to set tcp nodelay: {e}");
         }
 
-        let connection = Connection::new(stream, world, players.clone());
+        let connection = match Connection::new(stream, world, players.clone(), packets) {
+            Ok(connection) => connection,
+
+            Err(e) => return eprintln!("Connection {ip} failed to set up: {e}")
+        };
 
         match connection.handle() {
             Ok((connection, player)) => {
