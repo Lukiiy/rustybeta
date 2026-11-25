@@ -1,3 +1,8 @@
+pub mod login;
+pub mod movement;
+pub mod interact;
+pub mod window;
+
 use std::io::{Read, Result, Error, ErrorKind};
 
 use super::PacketReader;
