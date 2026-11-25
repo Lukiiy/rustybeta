@@ -1,3 +1,6 @@
+use std::io::BufReader;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::io::Result;
 use std::net::TcpStream;
 use std::sync::Arc;
@@ -11,14 +14,22 @@ use entity::player::{Player, PlayerRegistry};
 use crate::packets::{registry, ConnectionAction, ConnectionContext};
 
 pub struct Connection {
+    reader: BufReader<TcpStream>,
     stream: TcpStream,
     world: Arc<Mutex<World>>,
-    players: PlayerRegistry
+    players: PlayerRegistry,
+    packets: Arc<PacketRegistry>
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry) -> Self {
-        Self { stream, world, players }
+    pub fn new(stream: TcpStream, world: Arc<Mutex<World>>, players: PlayerRegistry, packets: Arc<PacketRegistry>) -> Result<Self> {
+        Ok(Self {
+            reader: BufReader::new(stream.try_clone()?),
+            stream,
+            world,
+            players,
+            packets
+        })
     }
 
     /// Initialize a player's connection. handshakes & logins & sends initial chunks;
