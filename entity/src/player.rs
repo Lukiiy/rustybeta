@@ -4,7 +4,6 @@ use std::io::{Result, Write};
 
 use super::entity::Entity;
 use super::registry::{Identified, EntityRegistry};
-use protocol::PacketWriter;
 use protocol::clientbound::Clientbound;
 use world::Position;
 
