@@ -13,6 +13,10 @@ impl Encode for KeepAlive {
     fn encode<W: Write>(&self, _: &mut PacketWriter<W>) -> Result<()> { Ok(()) }
 }
 
+impl Decode for KeepAlive {
+    fn decode<R: Read>(_: &mut PacketReader<R>) -> Result<Self> { Ok(Self) }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Chat {
@@ -47,6 +51,12 @@ impl Packet for Kick {
 
 impl Encode for Kick {
     fn encode<W: Write>(&self, w: &mut PacketWriter<W>) -> Result<()> { w.write_string(&self.reason) }
+}
+
+impl Decode for Kick {
+    fn decode<R: Read>(r: &mut PacketReader<R>) -> Result<Self> {
+        Ok(Self { reason: r.read_string()? })
+    }
 }
 
 
