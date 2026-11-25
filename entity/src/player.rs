@@ -1,10 +1,11 @@
 use std::net::TcpStream;
 use std::sync::{Mutex};
-use std::io::{Result};
+use std::io::{Result, Write};
 
 use super::entity::Entity;
 use super::registry::{Identified, EntityRegistry};
 use protocol::PacketWriter;
+use protocol::clientbound::Clientbound;
 use world::Position;
 
 pub struct Player {
@@ -40,13 +41,12 @@ impl Player {
         *self.position.lock().unwrap() = position;
     }
 
-    pub fn send(&self, f: impl FnOnce(&mut PacketWriter<TcpStream>) -> Result<()>) -> Result<()> {
-        let mut stream = self.write.lock().unwrap();
-        let mut writer = PacketWriter::new(&mut *stream);
+    pub fn send(&self, packet: impl Into<Clientbound>) -> Result<()> {
+        self.send_bytes(&packet.into().to_bytes()?)
+    }
 
-        f(&mut writer)?;
-
-        writer.flush()
+    pub fn send_bytes(&self, bytes: &[u8]) -> Result<()> {
+        self.write.lock().unwrap().write_all(bytes)
     }
 }
 
@@ -59,15 +59,19 @@ impl Identified for Player {
 pub type PlayerRegistry = EntityRegistry<Player>;
 
 impl PlayerRegistry {
-    pub fn broadcast(&self, f: impl Fn(&mut PacketWriter<TcpStream>) -> Result<()>) {
-        self.for_each(|player| { let _ = player.send(&f); });
+    pub fn broadcast(&self, packet: impl Into<Clientbound>) {
+        let Ok(bytes) = packet.into().to_bytes() else { return };
+
+        self.for_each(|p| {
+            let _ = p.send_bytes(&bytes);
+        });
     }
 
-    pub fn broadcast_except(&self, except_id: i32, f: impl Fn(&mut PacketWriter<TcpStream>) -> Result<()>) {
-        self.for_each(|player| {
-            if player.id() != except_id {
-                let _ = player.send(&f);
-            }
+    pub fn broadcast_except(&self, except: i32, packet: impl Into<Clientbound>) {
+        let Ok(bytes) = packet.into().to_bytes() else { return };
+
+        self.for_each(|p| if p.id() != except {
+            let _ = p.send_bytes(&bytes);
         });
     }
 }
