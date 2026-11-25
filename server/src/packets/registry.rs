@@ -1,72 +1,52 @@
-use std::io::{Error, ErrorKind, Result};
-use std::net::TcpStream;
-use std::sync::OnceLock;
+use std::io::Result;
 
-use protocol::{PacketReader};
+use protocol::codec::Packet;
+use protocol::serverbound::Serverbound;
+use crate::packets::handlers;
+
 use super::context::{ConnectionAction, ConnectionContext};
 
-/// Defines a packet that the clients will send to the server.
-/// Needs ID and binary serialization & deserialization code.
-pub trait ServerboundPacket: Sized {
-    const ID: u8;
+type Handler = Box<dyn Fn(&mut ConnectionContext, Serverbound) -> Result<ConnectionAction> + Send + Sync>;
 
-    fn read(reader: &mut PacketReader<&mut TcpStream>) -> Result<Self>;
-    fn handle(self, ctx: &mut ConnectionContext) -> Result<ConnectionAction>;
+/// wraps a closure, letting the bound imply the handlers lifetime type ig
+fn boxed<F>(f: F) -> Handler where F: Fn(&mut ConnectionContext, Serverbound) -> Result<ConnectionAction> + Send + Sync + 'static {
+    Box::new(f)
 }
 
-type PacketHandlerFn = fn(&mut ConnectionContext) -> Result<ConnectionAction>;
-
 pub struct PacketRegistry {
-    handlers: [Option<PacketHandlerFn>; 256],
+    handlers: Vec<Option<Handler>>
 }
 
 impl PacketRegistry {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
-            handlers: [None; 256],
+            handlers: (0..256).map(|_| None).collect()
         }
     }
 
-    pub fn register<P: ServerboundPacket>(&mut self) {
-        self.handlers[P::ID as usize] = Some(|ctx| {
-            let packet = P::read(&mut PacketReader::new(&mut ctx.stream))?;
+    pub fn vanilla() -> Self {
+        let mut registry = Self::empty();
 
-            packet.handle(ctx)
-        });
+        handlers::register(&mut registry);
+        registry
     }
 
-    pub fn handle(&self, id: u8, ctx: &mut ConnectionContext) -> Result<ConnectionAction> {
-        if let Some(handler) = self.handlers[id as usize] {
-            handler(ctx)
-        } else {
-            Err(Error::new(ErrorKind::InvalidData, format!("Unhandled packet 0x{id:02X}")))
+    /// sets the handler for the packet
+    pub fn on<P>(&mut self, f: impl Fn(&mut ConnectionContext, P) -> Result<ConnectionAction> + Send + Sync + 'static) -> &mut Self where P: Packet + TryFrom<Serverbound> {
+        self.handlers[P::ID as usize] = Some(boxed(move |ctx, packet| match P::try_from(packet) {
+            Ok(p) => f(ctx, p),
+
+            Err(_) => Ok(ConnectionAction::Continue)
+        }));
+
+        self
+    }
+
+    pub fn dispatch(&self, ctx: &mut ConnectionContext, packet: Serverbound) -> Result<ConnectionAction> {
+        match &self.handlers[packet.id() as usize] {
+            Some(handler) => handler(ctx, packet),
+
+            None => Ok(ConnectionAction::Continue)
         }
     }
-}
-
-pub fn registry() -> &'static PacketRegistry {
-    static REGISTRY: OnceLock<PacketRegistry> = OnceLock::new();
-
-    REGISTRY.get_or_init(|| {
-        let mut r = PacketRegistry::new();
-
-        r.register::<super::handlers::KeepAlivePacket>();
-        r.register::<super::handlers::PlayerFlyingPacket>();
-        r.register::<super::handlers::PlayerPositionPacket>();
-        r.register::<super::handlers::PlayerLookPacket>();
-        r.register::<super::handlers::PlayerPosLookPacket>();
-        r.register::<super::handlers::ChatMessagePacket>();
-        r.register::<super::handlers::AnimationPacket>();
-        r.register::<super::handlers::CloseWindowPacket>();
-        r.register::<super::handlers::PlayerDiggingPacket>();
-        r.register::<super::handlers::BlockPlacementPacket>();
-        r.register::<super::handlers::EntityActionPacket>();
-        r.register::<super::handlers::UseEntityPacket>();
-        r.register::<super::handlers::HeldItemChangePacket>();
-        r.register::<super::handlers::WindowClickPacket>();
-        r.register::<super::handlers::TransactionPacket>();
-        r.register::<super::handlers::DisconnectPacket>();
-
-        r
-    })
 }
