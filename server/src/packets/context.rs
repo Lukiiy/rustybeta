@@ -1,4 +1,3 @@
-use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 
 use entity::player::{Player, PlayerRegistry};
@@ -51,6 +50,6 @@ impl<'a> ConnectionContext<'a> {
             }.into()
         };
 
-        self.players.broadcast_packet_except(id, packet);
+        self.players.broadcast_except(id, packet);
     }
 }
