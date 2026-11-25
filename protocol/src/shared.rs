@@ -66,3 +66,43 @@ impl Encode for Animation {
         w.write_u8(self.animate)
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct Transaction {
+    pub id: u8,
+    pub action: i16,
+    pub accepted: bool
+}
+
+impl Packet for Transaction {
+    const ID: u8 = 0x6A;
+}
+
+impl Decode for Transaction {
+    fn decode<R: Read>(r: &mut PacketReader<R>) -> Result<Self> {
+        Ok(Self {
+            id: r.read_u8()?,
+            action: r.read_i16()?,
+            accepted: r.read_bool()?
+        })
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct CloseWindow {
+    pub id: u8
+}
+
+impl Packet for CloseWindow {
+    const ID: u8 = 0x65;
+}
+
+impl Decode for CloseWindow {
+    fn decode<R: Read>(r: &mut PacketReader<R>) -> Result<Self> {
+        Ok(Self {
+            id: r.read_u8()?
+        })
+    }
+}
