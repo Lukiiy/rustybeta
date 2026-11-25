@@ -1,43 +1,76 @@
-use std::io::{Read, Result, Error, ErrorKind};
+pub mod login;
+pub mod movement;
+pub mod interact;
+pub mod window;
 
-use super::PacketReader;
+use std::io::{Error, ErrorKind, Read, Result};
 
-#[derive(Debug)]
-pub struct Handshake {
-    pub username: String
+use crate::PacketReader;
+use crate::codec::{Decode, Packet};
+use crate::shared;
+
+macro_rules! serverbound { // todo template!!!
+    ($($name:ident($ty:ty)),* $(,)?) => { // name + type + varags* with ,
+        #[derive(Debug, Clone)]
+        pub enum Serverbound {
+            $($name($ty)),*
+        }
+
+        impl Serverbound {
+            pub fn id(&self) -> u8 {
+                match self {
+                    $(Self::$name(_) => <$ty as Packet>::ID),*
+                }
+            }
+
+            pub fn decode<R: Read>(r: &mut PacketReader<R>) -> Result<Self> {
+                match r.read_u8()? {
+                    $(id if id == <$ty as Packet>::ID => Ok(Self::$name(<$ty>::decode(r)?)),)*
+
+                    id => Err(Error::new(ErrorKind::InvalidData, format!("Unhandled packet 0x{id:02X}")))
+                }
+            }
+        }
+
+        $(
+            impl From<$ty> for Serverbound {
+                fn from(p: $ty) -> Self { Self::$name(p) }
+            }
+
+            impl TryFrom<Serverbound> for $ty {
+                type Error = Serverbound;
+
+                /// Unwraps into a possible Packet, basically turning the enum into the typed version.
+                fn try_from(p: Serverbound) -> std::result::Result<Self, Serverbound> {
+                    match p {
+                        Serverbound::$name(p) => Ok(p),
+
+                        other => Err(other)
+                    }
+                }
+            }
+        )*
+    };
 }
 
-#[derive(Debug)]
-pub struct Login {
-    pub protocol_version: i32,
-    pub username: String,
-    pub world_seed: i64,
-    pub dimension: i8
-}
-
-pub fn read_handshake<R: Read>(reader: &mut PacketReader<R>) -> Result<Handshake> {
-    let packet_id = reader.read_u8()?;
-
-    if packet_id != 0x02 {
-        return Err(Error::new(ErrorKind::InvalidData, format!("Expected handshake, got packet id 0x{packet_id:02X}")));
-    }
-
-    Ok(Handshake {
-        username: reader.read_string()?
-    })
-}
-
-pub fn read_login<R: Read>(reader: &mut PacketReader<R>) -> Result<Login> {
-    let packet_id = reader.read_u8()?;
-
-    if packet_id != 0x01 {
-        return Err(Error::new(ErrorKind::InvalidData, format!("Expected login (0x01), got 0x{packet_id:02X}")));
-    }
-
-    Ok(Login {
-        protocol_version: reader.read_i32()?,
-        username: reader.read_string()?,
-        world_seed: reader.read_i64()?,
-        dimension: reader.read_u8()? as i8
-    })
+serverbound! {
+    KeepAlive(shared::KeepAlive),
+    Chat(shared::Chat),
+    Kick(shared::Kick),
+    Animation(shared::Animation),
+    Transaction(shared::Transaction),
+    CloseWindow(shared::CloseWindow),
+    Handshake(login::Handshake),
+    Login(login::Login),
+    ServerListPing(login::ServerListPing),
+    PlayerFlying(movement::PlayerFlying),
+    PlayerPosition(movement::PlayerPosition),
+    PlayerLook(movement::PlayerLook),
+    PlayerPositionLook(movement::PlayerPositionLook),
+    PlayerDigging(interact::PlayerDigging),
+    BlockPlacement(interact::BlockPlacement),
+    EntityAction(interact::EntityAction),
+    UseEntity(interact::UseEntity),
+    HeldItemChange(interact::HeldItemChange),
+    WindowClick(window::WindowClick)
 }

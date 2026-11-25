@@ -1,5 +1,7 @@
 use std::io::{Read, Result, Error, ErrorKind};
 
+use world::ItemStack;
+
 pub struct PacketReader<'a, R: Read> {
     reader: &'a mut R
 }
@@ -62,5 +64,18 @@ impl<'a, R: Read> PacketReader<'a, R> {
 
     pub fn read_bool(&mut self) -> Result<bool> {
         Ok(self.read_u8()? != 0)
+    }
+
+    pub fn read_itemstack(&mut self) -> Result<Option<ItemStack>> {
+        let id = self.read_i16()?;
+        if id < 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(ItemStack {
+            id,
+            count: self.read_u8()?,
+            damage: self.read_i16()?
+        }))
     }
 }
