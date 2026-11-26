@@ -1,0 +1,16 @@
+pub const BLACK: &str = "§0";
+pub const DARK_BLUE: &str = "§1";
+pub const DARK_GREEN: &str = "§2";
+pub const DARK_AQUA: &str = "§3";
+pub const DARK_RED: &str = "§4";
+pub const DARK_PURPLE: &str = "§5";
+pub const GOLD: &str = "§6";
+pub const GRAY: &str = "§7";
+pub const DARK_GRAY: &str = "§8";
+pub const BLUE: &str = "§9";
+pub const GREEN: &str = "§a";
+pub const AQUA: &str = "§b";
+pub const RED: &str = "§c";
+pub const LIGHT_PURPLE: &str = "§d";
+pub const YELLOW: &str = "§e";
+pub const WHITE: &str = "§f";
